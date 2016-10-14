@@ -233,14 +233,19 @@ test_check_traceroute() {
 	cat $Fe_trace
 	echo
 
-	# Check for no missing replices from hops in one of outputs
-	grep -q '*' $Fd_trace
-	Fd_no_response=$?
+	# Check for missing replies from hops in traces (expect at lest one failure)
+	set +e
+	{
+		grep -q '*' $Fd_trace
+		Fd_no_response=$?
 
-	grep -q '*' $Fe_trace
-	Fe_no_response=$?
+		grep -q '*' $Fe_trace
+		Fe_no_response=$?
+	}
+	set -e
 
-	test ! $Fd_no_response -o ! $Fe_no_response
+	# Succeed if one of the traces ran without any missed replies
+	test $Fd_no_response -eq 1 -o $Fe_no_response -eq 1
 }
 
 test_teardown() {
