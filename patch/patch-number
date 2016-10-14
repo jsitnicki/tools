@@ -1,20 +1,26 @@
-#!/usr/bin/perl -w
+#!/usr/bin/perl
 #
 # patch-number - Extract sequence number from a patch file
 #
-# Usage: patch-number [file]...
+# Usage: patch-number [file]
 #
 # Reads from STDIN if patch file was not specified.
-# Multiple patch files can be specified.
+# If patch doesn't have a sequence number, it defaults to 1.
 #
 # Author: Jakub Sitnicki <jkbs@redhat.com>
 #
 
 use strict;
+use warnings;
+
+my $patch_number = 1;
 
 # Read from one or more files specified on the command line or STDIN
 while (<>) {
-	if (/^Subject:\s+\[.+ (\d+)\/\d+/) {
-		print $1, "\n";
-	}
+    if (/^Subject:\s+\[.+ (\d+)\/\d+/) {
+	$patch_number = $1;
+	last;
+    }
 }
+
+print "$patch_number\n";
