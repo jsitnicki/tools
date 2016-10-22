@@ -56,7 +56,7 @@ def packet_callback(pkt):
     if resp:
         sendp(resp, iface=IFACE);
 
-    return pkt.summary()
+    return "\n".join([pkt.summary(), resp.summary()])
 
 
 if __name__ == "__main__":
