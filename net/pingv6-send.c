@@ -7,8 +7,9 @@
  * Read data from standard input (up to 4096 bytes) and send it as a payload of
  * ICMPv6 Echo Request message to a host:port specified on the command line.
  *
- * Uses PINGv6 sockets. Remember to them for your user:
- * echo <uid> <gid> > /proc/sys/net/ipv4/ping_group_range
+ * Uses PINGv6 sockets. Remember to enable them for your user:
+ *
+ *   echo <gid> <gid> > /proc/sys/net/ipv4/ping_group_range
  */
 
 #define _GNU_SOURCE
