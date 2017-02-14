@@ -4,22 +4,30 @@
 #
 # Author: Jakub Sitnicki <jkbs@redhat.com>
 #
-"""
-Simple HTTP server that serves the current directory.
+"""\
+Simple HTTP server that serves the current directory contents.
 
 Server also recognizes 2 special HTTP GET queries:
 
   http://<address>:<port>/?ip - report client's IP address
   http://<address>:<port>/?ns - report server's network namespace
+  http://<address>:<port>/?bytes=<N> - return '@' repeated N times as
+                                       document body
 
-examples:
+Examples:
 
   $ ./toy-httpd.py 2>/dev/null &
   Serving HTTP on :: port 8000 ...
+
   $ curl [::1]:8000/?ip
   Your IP address is ::1
+
   $ curl [::1]:8000/?ns
   You have reached namespace net:[4026531969]
+
+  $ curl [::1]:8000/?bytes=42
+  @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@<no new line>
+
   $ echo 'Hello HTTP' > hello.txt
   $ curl [::1]:8000/hello.txt
   Hello HTTP
@@ -30,6 +38,7 @@ import argparse
 import socket
 import sys
 import os
+import urlparse
 import BaseHTTPServer
 from BaseHTTPServer import HTTPServer
 from SimpleHTTPServer import SimpleHTTPRequestHandler
@@ -41,6 +50,11 @@ class RequestHandler(SimpleHTTPRequestHandler):
       self.respond('Your IP address is %s\n' % self.client_address[0])
     elif self.path == '/?ns':
       self.respond('You have reached namespace %s\n' % os.readlink('/proc/self/ns/net'))
+    elif self.path.startswith('/?bytes'):
+      query = urlparse.urlparse(self.path).query
+      howmany = urlparse.parse_qs(query, keep_blank_values=True)['bytes'][0]
+      howmany = int(howmany) if howmany else 0
+      self.respond('@' * howmany)
     else:
       return SimpleHTTPRequestHandler.do_GET(self)
 
