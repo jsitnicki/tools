@@ -1,0 +1,88 @@
+---
+- name: Global vars
+  hosts: all
+  tasks:
+  - set_fact:
+      CLIENT: fc00::a
+      SERVER: fc00::b
+      PLEN: 64
+      PKT_SIZE: 2000
+      PORT: 6666
+      ALGO_KEY: ""
+
+- name: Conditional vars
+  hosts: all
+  gather_facts: yes
+  tasks:
+  - name: Get lsb_release
+    yum: name=redhat-lsb-core state=present
+  - name: (QUIRK) ip xfrm state needs an ALGO_KEY on RHEL6
+    set_fact:
+      ALGO_KEY: 0x1111
+    when: ansible_os_family == "RedHat" and ansible_lsb.major_release|int == 6
+
+- name: Client vars
+  hosts: client
+  tasks:
+  - set_fact:
+      ADDR: "{{CLIENT}}"
+      DIR: out
+
+- name: Server vars
+  hosts: server
+  tasks:
+  - set_fact:
+      ADDR: "{{SERVER}}"
+      DIR: in
+
+- name: Common setup
+  hosts: all
+  tasks:
+  - shell: |
+      ip link set {{DEV}} down
+      ip addr flush {{DEV}}
+
+      ethtool -A {{DEV}} rx off tx off || true
+
+      ip addr add {{ADDR}}/{{PLEN}} dev {{DEV}} nodad
+      ip link set {{DEV}} up
+
+      ip xfrm policy flush
+      ip xfrm state flush
+
+      ip xfrm policy add \
+         src {{CLIENT}} dst {{SERVER}} dir {{DIR}} \
+         tmpl src {{CLIENT}} dst {{SERVER}} proto comp mode transport
+
+      ip xfrm state add \
+         src {{CLIENT}} dst {{SERVER}} \
+         proto comp spi 1 comp deflate {{ALGO_KEY}} \
+         mode transport sel src {{CLIENT}} dst {{SERVER}}
+
+- name: Ping test
+  hosts: client
+  tasks:
+  - command: ping6 -c 1 -w 1 -s {{PKT_SIZE}} {{SERVER}}
+
+- name: Run UDP sink
+  hosts: server
+  tasks:
+  - command: socat udp6-listen:{{PORT}} -
+    async: 60
+    poll: 0
+
+- name: Run UDP source & capture traffic
+  hosts: client
+  tasks:
+  - command: tcpdump -ni {{DEV}} "host {{SERVER}}"
+    async: 60
+    poll: 0
+    register: tcpdump_async
+
+  - command: socat /dev/zero,readbytes={{PKT_SIZE}} udp6-sendto:[{{SERVER}}]:{{PORT}}
+
+  - command: pkill tcpdump
+
+  - async_status: jid="{{tcpdump_async.ansible_job_id}}"
+    register: tcpdump_result
+  - debug: var=tcpdump_result.stdout_lines

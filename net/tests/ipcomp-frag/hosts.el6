@@ -1,0 +1,4 @@
+[client]
+rhel69-1 DEV=eth1
+[server]
+rhel69-2 DEV=eth1
