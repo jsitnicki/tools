@@ -1,0 +1,24 @@
+#!/bin/bash
+
+function usage {
+	cat <<-END >&2
+	USAGE: hit-and-run <command>
+
+	Report the PID, wait for a key press, and execute a given command.
+
+	Use for tracing short-lived processes with tracing tools (like ftrace)
+	that can't execute and trace a given command but allow tracing a PID.
+
+	Similiar to ftrace-me script from https://lwn.net/Articles/370423/ but
+	can be used used with ftrace wrappers like funcgraph from perf-tools
+	(https://github.com/brendangregg/perf-tools).
+
+END
+	exit
+}
+
+(( $# == 0 )) && usage
+
+echo "PID is $$"
+read -p "Enter to run '$*'"
+exec "$@"
