@@ -111,6 +111,16 @@ conf_forwarding_v6()
 	E sysctl -q -w net.ipv6.conf.all.forwarding=1
 }
 
+conf_reflection_v6()
+{
+	log "Enabling Flow Label reflection on server namespaces (experimental, not upstream)"
+
+	if [ -e /proc/sys/net/ipv6/flowlabel_reflect ]; then
+		Fd sysctl -q -w net.ipv6.flowlabel_reflect=1
+		Fe sysctl -q -w net.ipv6.flowlabel_reflect=1
+	fi
+}
+
 conf_addrs_v4()
 {
 	log "Configuring IPv4 addresses"
@@ -243,6 +253,7 @@ setup()
 	conf_link_mtu
 	conf_forwarding_v4
 	conf_forwarding_v6
+	conf_reflection_v6
 	conf_addrs_v4
 	conf_addrs_v6
 	set_ifaces_up
