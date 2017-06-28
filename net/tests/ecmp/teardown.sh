@@ -37,7 +37,7 @@ report_test_result()
 {
 	local exit_status=$1
 
-	[[ $exit_status == 0 ]] && msg_ok "SUCCESS" || msg_err "FAIL"
+	(( $exit_status == 0 )) && msg_ok "SUCCESS" || msg_err "FAIL"
 }
 
 teardown()
