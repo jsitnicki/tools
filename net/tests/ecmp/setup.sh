@@ -113,7 +113,7 @@ conf_forwarding_v6()
 
 conf_reflection_v6()
 {
-	log "Enabling Flow Label reflection on server namespaces (experimental, not upstream)"
+	log "Enabling Flow Label reflection on server namespaces (EXPERIMENTAL)"
 
 	if [ -e /proc/sys/net/ipv6/flowlabel_reflect ]; then
 		Fd sysctl -q -w net.ipv6.flowlabel_reflect=1
