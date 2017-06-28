@@ -7,6 +7,12 @@ basedir=$(dirname "$0")
 . $basedir/vars.sh
 . $basedir/funcs.sh
 
+kill_processes()
+{
+	for ns in A B C D E Fd Fe; do
+		ip netns pids $ns | xargs kill 2>/dev/null
+	done
+}
 
 destroy_namespaces()
 {
@@ -39,6 +45,7 @@ teardown()
 {
 	log "Starting teardown"
 	# debug_maybe
+	kill_processes
 	destroy_namespaces
 	report_test_result "$@"
 }
