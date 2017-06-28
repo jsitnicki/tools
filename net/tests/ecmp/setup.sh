@@ -242,6 +242,14 @@ conf_routes_multipath_v6()
 	  nexthop via $EC6
 }
 
+run_tcpdump()
+{
+	A  tcpdump -U -s0 -n -nn -w  A.cap -i any &
+	Fd tcpdump -U -s0 -n -nn -w Fd.cap -i any &
+	Fe tcpdump -U -s0 -n -nn -w Fe.cap -i any &
+	sleep 0.1
+}
+
 setup()
 {
 	log "Starting setup"
@@ -261,6 +269,7 @@ setup()
 	conf_routes_default_v6
 	conf_routes_multipath_v4
 	conf_routes_multipath_v6
+	# run_tcpdump
 }
 
 setup
