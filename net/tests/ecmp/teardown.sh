@@ -25,9 +25,12 @@ destroy_namespaces()
 
 debug_maybe()
 {
-	log "Going into debug shell"
+	local exit_status=$1
 
-	PS1='DEBUG \$ ' bash
+	if (( $exit_status != 0 )); then
+		log "Going into debug shell"
+		PS1='DEBUG \$ ' bash
+	fi
 }
 
 report_test_result()
@@ -40,7 +43,7 @@ report_test_result()
 teardown()
 {
 	log "Starting teardown"
-	# debug_maybe
+	debug_maybe "$@"
 	kill_processes
 	destroy_namespaces
 	report_test_result "$@"
