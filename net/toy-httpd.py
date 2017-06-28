@@ -40,7 +40,7 @@ import sys
 import os
 import urlparse
 import BaseHTTPServer
-from BaseHTTPServer import HTTPServer
+import SocketServer
 from SimpleHTTPServer import SimpleHTTPRequestHandler
 
 
@@ -65,8 +65,13 @@ class RequestHandler(SimpleHTTPRequestHandler):
     self.wfile.write(msg)
 
 
-class HTTPServerV6(HTTPServer):
+class HTTPServerV4(SocketServer.TCPServer):
+  address_family = socket.AF_INET
+  allow_reuse_address = 1
+
+class HTTPServerV6(SocketServer.TCPServer):
   address_family = socket.AF_INET6
+  allow_reuse_address = 1
 
 
 def main():
@@ -83,7 +88,7 @@ def main():
   if args.use_ipv6:
     ServerClass = HTTPServerV6
   else:
-    ServerClass = HTTPServer
+    ServerClass = HTTPServerV4
 
   # BaseHTTPServer.test() expects just one positional argument
   sys.argv[1:] = [ args.port ]
