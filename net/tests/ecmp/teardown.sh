@@ -18,13 +18,9 @@ destroy_namespaces()
 {
 	log "Destroying namespaces"
 
-	ip netns del A
-	ip netns del B
-	ip netns del C
-	ip netns del D
-	ip netns del E
-	ip netns del Fd
-	ip netns del Fe
+	for ns in A B C D E Fd Fe;  do
+		ip netns del $ns
+	done
 }
 
 debug_maybe()
