@@ -4,107 +4,112 @@ set -e
 
 basedir=$(dirname "$0")
 
-. $basedir/vars.sh
 . $basedir/funcs.sh
 
 test_ping_local_and_neighbours_v4()
 {
+	local i ns1 ns2
+
 	log "Testing IPv4 ping to local address and to neighbours"
 
-	A ping -4 -c1 -w1 -n -q $AB4 > /dev/null
-	A ping -4 -c1 -w1 -n -q $BA4 > /dev/null
+	i=1
+	ns1=C1
+	for ns2 in F1 F2 R1; do
+		$ns1 ping -4 -c1 -w1 -n -q 10.0.$i.1 > /dev/null
+		$ns1 ping -4 -c1 -w1 -n -q 10.0.$i.2 > /dev/null
 
-	B ping -4 -c1 -w1 -n -q $BA4 > /dev/null
-	B ping -4 -c1 -w1 -n -q $AB4 > /dev/null
+		$ns2 ping -4 -c1 -w1 -n -q 10.0.$i.2 > /dev/null
+		$ns2 ping -4 -c1 -w1 -n -q 10.0.$i.1 > /dev/null
 
-	B ping -4 -c1 -w1 -n -q $BC4 > /dev/null
-	B ping -4 -c1 -w1 -n -q $CB4 > /dev/null
+		i=$((i+1))
+		ns1=$ns2
+	done
 
-	C ping -4 -c1 -w1 -n -q $CB4 > /dev/null
-	C ping -4 -c1 -w1 -n -q $BC4 > /dev/null
+	i=1
+	ns1=R1
+	for ns2 in L{1..9}; do
+		$ns1 ping -4 -c1 -w1 -n -q 10.1.$i.1 > /dev/null
+		$ns1 ping -4 -c1 -w1 -n -q 10.1.$i.2 > /dev/null
 
-	C ping -4 -c1 -w1 -n -q $CD4 > /dev/null
-	C ping -4 -c1 -w1 -n -q $DC4 > /dev/null
+		$ns2 ping -4 -c1 -w1 -n -q 10.1.$i.2 > /dev/null
+		$ns2 ping -4 -c1 -w1 -n -q 10.1.$i.1 > /dev/null
 
-	C ping -4 -c1 -w1 -n -q $CE4 > /dev/null
-	C ping -4 -c1 -w1 -n -q $EC4 > /dev/null
+		i=$((i+1))
+	done
 
-	D ping -4 -c1 -w1 -n -q $DC4 > /dev/null
-	D ping -4 -c1 -w1 -n -q $CD4 > /dev/null
+	for i in {1..9}; do
+		ns1=L$i
+		ns2=S$i
 
-	D ping -4 -c1 -w1 -n -q $DF4 > /dev/null
-	D ping -4 -c1 -w1 -n -q $FD4 > /dev/null
+		$ns1 ping -4 -c1 -w1 -n -q 10.2.0.1 > /dev/null
+		$ns1 ping -4 -c1 -w1 -n -q 10.2.0.2 > /dev/null
 
-	E ping -4 -c1 -w1 -n -q $EC4 > /dev/null
-	E ping -4 -c1 -w1 -n -q $CE4 > /dev/null
-
-	E ping -4 -c1 -w1 -n -q $EF4 > /dev/null
-	E ping -4 -c1 -w1 -n -q $FE4 > /dev/null
-
-	Fd ping -4 -c1 -w1 -n -q $FD4 > /dev/null
-	Fd ping -4 -c1 -w1 -n -q $DF4 > /dev/null
-
-	Fe ping -4 -c1 -w1 -n -q $FE4 > /dev/null
-	Fe ping -4 -c1 -w1 -n -q $EF4 > /dev/null
+		$ns2 ping -4 -c1 -w1 -n -q 10.2.0.2 > /dev/null
+		$ns2 ping -4 -c1 -w1 -n -q 10.2.0.1 > /dev/null
+	done
 }
 
 test_ping_thru_multipath_router_v4()
 {
 	log "Testing IPv4 through ECMP router"
 
-	C ping -4 -c1 -w1 -n -q $FF4 > /dev/null
-	B ping -4 -c1 -w1 -n -q $FF4 > /dev/null
-	A ping -4 -c1 -w1 -n -q $FF4 > /dev/null
+	R1 ping -4 -c1 -w1 -n -q 10.2.0.2 > /dev/null
+	F2 ping -4 -c1 -w1 -n -q 10.2.0.2 > /dev/null
+	F1 ping -4 -c1 -w1 -n -q 10.2.0.2 > /dev/null
+	C1 ping -4 -c1 -w1 -n -q 10.2.0.2 > /dev/null
 }
 
 test_ping_local_and_neighbours_v6()
 {
+	local i ns1 ns2
+
 	log "Testing IPv6 ping to local address and to neighbours"
 
-	A ping -6 -c1 -w1 -n -q $AB6 > /dev/null
-	A ping -6 -c1 -w1 -n -q $BA6 > /dev/null
+	i=1
+	ns1=C1
+	for ns2 in F1 F2 R1; do
+		$ns1 ping -6 -c1 -w1 -n -q fd00:0:$i::1 > /dev/null
+		$ns1 ping -6 -c1 -w1 -n -q fd00:0:$i::2 > /dev/null
 
-	B ping -6 -c1 -w1 -n -q $BA6 > /dev/null
-	B ping -6 -c1 -w1 -n -q $AB6 > /dev/null
+		$ns2 ping -6 -c1 -w1 -n -q fd00:0:$i::2 > /dev/null
+		$ns2 ping -6 -c1 -w1 -n -q fd00:0:$i::1 > /dev/null
 
-	B ping -6 -c1 -w1 -n -q $BC6 > /dev/null
-	B ping -6 -c1 -w1 -n -q $CB6 > /dev/null
+		i=$((i+1))
+		ns1=$ns2
+	done
 
-	C ping -6 -c1 -w1 -n -q $CB6 > /dev/null
-	C ping -6 -c1 -w1 -n -q $BC6 > /dev/null
+	i=1
+	ns1=R1
+	for ns2 in L{1..9}; do
+		$ns1 ping -6 -c1 -w1 -n -q fd00:1:$i::1 > /dev/null
+		$ns1 ping -6 -c1 -w1 -n -q fd00:1:$i::2 > /dev/null
 
-	C ping -6 -c1 -w1 -n -q $CD6 > /dev/null
-	C ping -6 -c1 -w1 -n -q $DC6 > /dev/null
+		$ns2 ping -6 -c1 -w1 -n -q fd00:1:$i::2 > /dev/null
+		$ns2 ping -6 -c1 -w1 -n -q fd00:1:$i::1 > /dev/null
 
-	C ping -6 -c1 -w1 -n -q $CE6 > /dev/null
-	C ping -6 -c1 -w1 -n -q $EC6 > /dev/null
+		i=$((i+1))
+	done
 
-	D ping -6 -c1 -w1 -n -q $DC6 > /dev/null
-	D ping -6 -c1 -w1 -n -q $CD6 > /dev/null
+	for i in {1..9}; do
+		ns1=L$i
+		ns2=S$i
 
-	D ping -6 -c1 -w1 -n -q $DF6 > /dev/null
-	D ping -6 -c1 -w1 -n -q $FD6 > /dev/null
+		$ns1 ping -6 -c1 -w1 -n -q fd00:2:0::1 > /dev/null
+		$ns1 ping -6 -c1 -w1 -n -q fd00:2:0::2 > /dev/null
 
-	E ping -6 -c1 -w1 -n -q $EC6 > /dev/null
-	E ping -6 -c1 -w1 -n -q $CE6 > /dev/null
-
-	E ping -6 -c1 -w1 -n -q $EF6 > /dev/null
-	E ping -6 -c1 -w1 -n -q $FE6 > /dev/null
-
-	Fd ping -6 -c1 -w1 -n -q $FD6 > /dev/null
-	Fd ping -6 -c1 -w1 -n -q $DF6 > /dev/null
-
-	Fe ping -6 -c1 -w1 -n -q $FE6 > /dev/null
-	Fe ping -6 -c1 -w1 -n -q $EF6 > /dev/null
+		$ns2 ping -6 -c1 -w1 -n -q fd00:2:0::2 > /dev/null
+		$ns2 ping -6 -c1 -w1 -n -q fd00:2:0::1 > /dev/null
+	done
 }
 
 test_ping_thru_multipath_router_v6()
 {
 	log "Testing IPv6 through ECMP router"
 
-	C ping -6 -c1 -w1 -n -q $FF6 > /dev/null
-	B ping -6 -c1 -w1 -n -q $FF6 > /dev/null
-	A ping -6 -c1 -w1 -n -q $FF6 > /dev/null
+	R1 ping -6 -c1 -w1 -n -q fd00:2:0::2 > /dev/null
+	F2 ping -6 -c1 -w1 -n -q fd00:2:0::2 > /dev/null
+	F1 ping -6 -c1 -w1 -n -q fd00:2:0::2 > /dev/null
+	C1 ping -6 -c1 -w1 -n -q fd00:2:0::2 > /dev/null
 }
 
 test_ping()

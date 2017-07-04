@@ -1,52 +1,41 @@
 #!/bin/bash
 
-# set -x
+set -o errexit
 
 basedir=$(dirname "$0")
 
-. $basedir/vars.sh
 . $basedir/funcs.sh
 
 kill_processes()
 {
-	for ns in A B C D E Fd Fe; do
-		ip netns pids $ns | xargs kill 2>/dev/null
+	log "Kill all processes in namespaces"
+
+	for ns in C1 F1 F2 R1 {L,S}{1..9}; do
+		ip netns pids $ns | xargs kill 2>/dev/null || true
 	done
 }
 
 destroy_namespaces()
 {
-	log "Destroying namespaces"
+	log "Destroy namespaces"
 
-	for ns in A B C D E Fd Fe;  do
+	for ns in C1 F1 F2 R1 {L,S}{1..9};  do
 		ip netns del $ns
 	done
 }
 
-debug_maybe()
+cleanup()
 {
-	local exit_status=$1
-
-	if (( $exit_status != 0 )); then
-		log "Going into debug shell"
-		PS1='DEBUG \$ ' bash
-	fi
-}
-
-report_test_result()
-{
-	local exit_status=$1
-
-	(( $exit_status == 0 )) && msg_ok "SUCCESS" || msg_err "FAIL"
+	kill_processes
+	destroy_namespaces
 }
 
 teardown()
 {
 	log "Starting teardown"
-	debug_maybe "$@"
+
 	kill_processes
 	destroy_namespaces
-	report_test_result "$@"
 }
 
-teardown "$@"
+teardown

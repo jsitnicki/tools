@@ -4,250 +4,269 @@ set -e
 
 basedir=$(dirname "$0")
 
-. $basedir/vars.sh
 . $basedir/funcs.sh
-
 
 create_namespaces()
 {
 	log "Creating namespaces"
 
-	ip netns add A
-	ip netns add B
-	ip netns add C
-	ip netns add D
-	ip netns add E
-	ip netns add Fd
-	ip netns add Fe
+	for ns in C1 F1 F2 R1 {L,S}{1..9}; do
+		ip netns add $ns
+	done
 }
 
 link_namespaces()
 {
+	local i ns1 ns2
+
 	log "Linking namespaces"
 
-	ip li add AB type veth peer name BA
-	ip li set dev AB netns A
-	ip li set dev BA netns B
+	ns1=C1
+	for ns2 in F1 F2 R1; do
+		ip li add $ns1$ns2 type veth peer name $ns2$ns1
+		ip li set dev $ns1$ns2 netns $ns1
+		ip li set dev $ns2$ns1 netns $ns2
+		ns1=$ns2
+	done
 
-	ip li add BC type veth peer name CB
-	ip li set dev BC netns B
-	ip li set dev CB netns C
+	ns1=R1
+	for ns2 in L{1..9}; do
+		ip li add $ns1$ns2 type veth peer name $ns2$ns1
+		ip li set dev $ns1$ns2 netns $ns1
+		ip li set dev $ns2$ns1 netns $ns2
+	done
 
-	ip li add CD type veth peer name DC
-	ip li set dev CD netns C
-	ip li set dev DC netns D
+	for i in {1..9}; do
+		ns1=L$i
+		ns2=S$i
 
-	ip li add CE type veth peer name EC
-	ip li set dev CE netns C
-	ip li set dev EC netns E
-
-	ip li add DF type veth peer name FD
-	ip li set dev DF netns D
-	ip li set dev FD netns Fd
-
-	ip li add EF type veth peer name FE
-	ip li set dev EF netns E
-	ip li set dev FE netns Fe
-}
-
-print_topology()
-{
-	log "Network topology"
-
-	cat <<_EOF_
-
-                     [D] -- [Fd]
-                    /
-   [A] -- [B] == [C]
-                    \\
-                     [E] -- [Fe]
-
-_EOF_
+		ip li add $ns1$ns2 type veth peer name $ns2$ns1
+		ip li set dev $ns1$ns2 netns $ns1
+		ip li set dev $ns2$ns1 netns $ns2
+	done
 }
 
 conf_tso_off()
 {
+	local i ns1 ns2
+
 	log "Setting TSO off to make PMTUD work NS-NS"
 
-	A ethtool -K AB tso off
-	B ethtool -K BA tso off
-	B ethtool -K BC tso off
-	C ethtool -K CB tso off
-	C ethtool -K CD tso off
-	C ethtool -K CE tso off
-	D ethtool -K DC tso off
-	D ethtool -K DF tso off
-	E ethtool -K EC tso off
-	E ethtool -K EF tso off
-	Fd ethtool -K FD tso off
-	Fe ethtool -K FE tso off
-}
+	ns1=C1
+	for ns2 in F1 F2 R1; do
+		$ns1 ethtool -K $ns1$ns2 tso off
+		$ns2 ethtool -K $ns2$ns1 tso off
+		ns1=$ns2
+	done
 
-conf_link_mtu()
-{
-	log "Configuring link MTU from B to C"
+	ns1=R1
+	for ns2 in L{1..9}; do
+		$ns1 ethtool -K $ns1$ns2 tso off
+		$ns2 ethtool -K $ns2$ns1 tso off
+	done
 
-	B ip li set dev BC mtu 1400
-	C ip li set dev CB mtu 1400
+	for i in {1..9}; do
+		ns1=L$i
+		ns2=S$i
+
+		$ns1 ethtool -K $ns1$ns2 tso off
+		$ns2 ethtool -K $ns2$ns1 tso off
+	done
 }
 
 conf_forwarding_v4()
 {
+	local ns
+
 	log "Configuring IPv4 forwarding"
 
-	B sysctl -q -w net.ipv4.conf.all.forwarding=1
-	C sysctl -q -w net.ipv4.conf.all.forwarding=1
-	D sysctl -q -w net.ipv4.conf.all.forwarding=1
-	E sysctl -q -w net.ipv4.conf.all.forwarding=1
+	for ns in F1 F2 R1 L{1..9}; do
+		$ns sysctl -q -w net.ipv4.conf.all.forwarding=1
+	done
 }
 
 conf_forwarding_v6()
 {
+	local ns
+
 	log "Configuring IPv6 forwarding"
 
-	B sysctl -q -w net.ipv6.conf.all.forwarding=1
-	C sysctl -q -w net.ipv6.conf.all.forwarding=1
-	D sysctl -q -w net.ipv6.conf.all.forwarding=1
-	E sysctl -q -w net.ipv6.conf.all.forwarding=1
+	for ns in F1 F2 R1 L{1..9}; do
+		$ns sysctl -q -w net.ipv6.conf.all.forwarding=1
+	done
 }
 
 conf_reflection_v6()
 {
+	local ns
+
 	log "Enabling Flow Label reflection on server namespaces (EXPERIMENTAL)"
 
 	if [ -e /proc/sys/net/ipv6/flowlabel_reflect ]; then
-		Fd sysctl -q -w net.ipv6.flowlabel_reflect=1
-		Fe sysctl -q -w net.ipv6.flowlabel_reflect=1
+		for ns in S{1..9}; do
+			$ns sysctl -q -w net.ipv6.flowlabel_reflect=1
+		done
 	fi
 }
 
 conf_addrs_v4()
 {
+	local i ns1 ns2
+
 	log "Configuring IPv4 addresses"
 
-	A ip ad add dev AB $AB4/$PREFIX4
-	B ip ad add dev BA $BA4/$PREFIX4
+	# L3 segments:
+	# 10.0.{1..3}./24
+	# 10.1.{1..9}./24
+	# 10.2.0./24 (anycast)
 
-	B ip ad add dev BC $BC4/$PREFIX4
-	C ip ad add dev CB $CB4/$PREFIX4
+	i=1
+	ns1=C1
+	for ns2 in F1 F2 R1; do
+		$ns1 ip ad add dev $ns1$ns2 10.0.$i.1/24
+		$ns2 ip ad add dev $ns2$ns1 10.0.$i.2/24
 
-	C ip ad add dev CD $CD4/$PREFIX4
-	D ip ad add dev DC $DC4/$PREFIX4
+		i=$((i+1))
+		ns1=$ns2
+	done
 
-	C ip ad add dev CE $CE4/$PREFIX4
-	E ip ad add dev EC $EC4/$PREFIX4
+	i=1
+	ns1=R1
+	for ns2 in L{1..9}; do
+		$ns1 ip ad add dev $ns1$ns2 10.1.$i.1/24
+		$ns2 ip ad add dev $ns2$ns1 10.1.$i.2/24
 
-	D  ip ad add dev DF $DF4/$PREFIX4
-	Fd ip ad add dev FD $FD4/$PREFIX4
+		i=$((i+1))
+	done
 
-	E  ip ad add dev EF $EF4/$PREFIX4
-	Fe ip ad add dev FE $FE4/$PREFIX4
+	for i in {1..9}; do
+		ns1=L$i
+		ns2=S$i
+
+		$ns1 ip ad add dev $ns1$ns2 10.2.0.1/24
+		$ns2 ip ad add dev $ns2$ns1 10.2.0.2/24
+	done
 }
 
 conf_addrs_v6()
 {
 	log "Configuring IPv6 addresses"
 
-	A ip ad add dev AB $AB6/$PREFIX6 nodad
-	B ip ad add dev BA $BA6/$PREFIX6 nodad
+	# L3 segments:
+	# fd00:0:{1..3}::/64
+	# fd00:1:{1..9}::/64
+	# fd00:2:0::/64 (anycast)
 
-	B ip ad add dev BC $BC6/$PREFIX6 nodad
-	C ip ad add dev CB $CB6/$PREFIX6 nodad
+	i=1
+	ns1=C1
+	for ns2 in F1 F2 R1; do
+		$ns1 ip ad add dev $ns1$ns2 fd00:0:$i::1/64
+		$ns2 ip ad add dev $ns2$ns1 fd00:0:$i::2/64
 
-	C ip ad add dev CD $CD6/$PREFIX6 nodad
-	D ip ad add dev DC $DC6/$PREFIX6 nodad
+		i=$((i+1))
+		ns1=$ns2
+	done
 
-	C ip ad add dev CE $CE6/$PREFIX6 nodad
-	E ip ad add dev EC $EC6/$PREFIX6 nodad
+	i=1
+	ns1=R1
+	for ns2 in L{1..9}; do
+		$ns1 ip ad add dev $ns1$ns2 fd00:1:$i::1/64
+		$ns2 ip ad add dev $ns2$ns1 fd00:1:$i::2/64
 
-	D  ip ad add dev DF $DF6/$PREFIX6 nodad
-	Fd ip ad add dev FD $FD6/$PREFIX6 nodad
+		i=$((i+1))
+	done
 
-	E  ip ad add dev EF $EF6/$PREFIX6 nodad
-	Fe ip ad add dev FE $FE6/$PREFIX6 nodad
+	for i in {1..9}; do
+		ns1=L$i
+		ns2=S$i
+
+		$ns1 ip ad add dev $ns1$ns2 fd00:2:0::1/64
+		$ns2 ip ad add dev $ns2$ns1 fd00:2:0::2/64
+	done
 }
 
 set_ifaces_up()
 {
 	log "Bringing interfaces up"
 
-	A  ip li set dev lo up
-	B  ip li set dev lo up
-	C  ip li set dev lo up
-	D  ip li set dev lo up
-	E  ip li set dev lo up
-	Fd ip li set dev lo up
-	Fe ip li set dev lo up
+	for ns in C1 F1 F2 R1 {L,S}{1..9}; do
+		$ns ip li set dev lo up
+	done
 
-	A ip li set dev AB up
-	B ip li set dev BA up
+	ns1=C1
+	for ns2 in F1 F2 R1; do
+		$ns1 ip li set dev $ns1$ns2 up
+		$ns2 ip li set dev $ns2$ns1 up
+		ns1=$ns2
+	done
 
-	B ip li set dev BC up
-	C ip li set dev CB up
+	ns1=R1
+	for ns2 in L{1..9}; do
+		$ns1 ip li set dev $ns1$ns2 up
+		$ns2 ip li set dev $ns2$ns1 up
+	done
 
-	C ip li set dev CD up
-	D ip li set dev DC up
+	for i in {1..9}; do
+		ns1=L$i
+		ns2=S$i
 
-	C ip li set dev CE up
-	E ip li set dev EC up
-
-	D  ip li set dev DF up
-	Fd ip li set dev FD up
-
-	E  ip li set dev EF up
-	Fe ip li set dev FE up
+		$ns1 ip li set dev $ns1$ns2 up
+		$ns2 ip li set dev $ns2$ns1 up
+	done
 }
 
 conf_routes_default_v4()
 {
+	local i ns nexthops
+
 	log "Configuring default IPv4 routes"
 
-	A  ip ro add default via $BA4
-	B  ip ro add default via $CB4
-	C  ip ro add default via $BC4
-	D  ip ro add default via $CD4
-	E  ip ro add default via $CE4
-	Fd ip ro add default via $DF4
-	Fe ip ro add default via $EF4
+	i=1
+	for ns in C1 F1 F2; do
+		$ns ip -4 ro add default via 10.0.$i.2
+		i=$((i+1))
+	done
+	F2 ip -4 ro add 10.0.1.0/24 via 10.0.2.1
+
+	nexthops=
+	for i in {1..9}; do
+		nexthops="$nexthops nexthop via 10.1.$i.2"
+	done
+	R1 ip -4 ro add default $nexthops
+	R1 ip -4 ro add 10.0.1.0/24 via 10.0.3.1
+	R1 ip -4 ro add 10.0.2.0/24 via 10.0.3.1
+
+	for i in {1..9}; do
+		L$i ip -4 ro add default via 10.1.$i.1
+		S$i ip -4 ro add default via 10.2.0.1
+	done
 }
 
 conf_routes_default_v6()
 {
+	local i ns nexthops
+
 	log "Configuring default IPv6 routes"
 
-	A  ip ro add default via $BA6
-	B  ip ro add default via $CB6
-	C  ip ro add default via $BC6
-	D  ip ro add default via $CD6
-	E  ip ro add default via $CE6
-	Fd ip ro add default via $DF6
-	Fe ip ro add default via $EF6
-}
+	i=1
+	for ns in C1 F1 F2; do
+		$ns ip -6 ro add default via fd00:0:$i::2
+		i=$((i+1))
+	done
+	F2 ip -6 ro add fd00:0:1::/64 via fd00:0:2::1
 
-conf_routes_multipath_v4()
-{
-	log "Configuring multipath IPv4 routes"
+	nexthops=
+	for i in {1..9}; do
+		nexthops="$nexthops nexthop via fd00:1:$i::2"
+	done
+	R1 ip -6 ro add default $nexthops
+	R1 ip -6 ro add fd00:0:1::/64 via fd00:0:3::1
+	R1 ip -6 ro add fd00:0:2::/64 via fd00:0:3::1
 
-	C ip ro add $FF4/32 \
-	  nexthop via $DC4 \
-	  nexthop via $EC4
-}
-
-conf_routes_multipath_v6()
-{
-	log "Configuring multipath IPv6 routes"
-
-	C ip ro add $FF6/128 \
-	  nexthop via $DC6 \
-	  nexthop via $EC6
-}
-
-run_tcpdump()
-{
-	A  tcpdump -U -s0 -n -nn -w  A.cap -i any &
-	Fd tcpdump -U -s0 -n -nn -w Fd.cap -i any &
-	Fe tcpdump -U -s0 -n -nn -w Fe.cap -i any &
-	sleep 0.1
+	for i in {1..9}; do
+		L$i ip -6 ro add default via fd00:1:$i::1
+		S$i ip -6 ro add default via fd00:2:0::1
+	done
 }
 
 setup()
@@ -256,9 +275,7 @@ setup()
 
 	create_namespaces
 	link_namespaces
-	print_topology
 	conf_tso_off
-	conf_link_mtu
 	conf_forwarding_v4
 	conf_forwarding_v6
 	conf_reflection_v6
@@ -267,9 +284,6 @@ setup()
 	set_ifaces_up
 	conf_routes_default_v4
 	conf_routes_default_v6
-	conf_routes_multipath_v4
-	conf_routes_multipath_v6
-	# run_tcpdump
 }
 
 setup
