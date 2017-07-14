@@ -1,9 +1,19 @@
 #!/usr/bin/env python3
-#
-# Count the flows received in one or more net namespaces.
-#
+"""
+Listen for TCP messages on a port range in one or more net namespaces
+and count unique L4 flows ({src addr, dst addr, src port, dst port}).
+
+USAGE: tcp-sink-multi.py [-p <port range>] <netns> [<netns> ...]
+
+    -p <port range>   Port or consecutive ports to listen on
+                      Example: -p 54321, -p 8080-8090
+
+    <netns>           Network namespace to open listening socket in
+
+"""
 
 import ctypes as ct
+import getopt
 import os
 import selectors
 import signal
@@ -26,8 +36,10 @@ sock_netns_map = {}
 flow_register = {}
 sel = selectors.DefaultSelector()
 
+
 def log(*args, **kwargs):
     print(*args, file=sys.stderr, **kwargs)
+
 
 def errcheck(ret, func, args):
     if ret == -1:
@@ -57,10 +69,11 @@ def enter_netns(netns_name):
     setns(netns_fd, CLONE_NEWNET)
 
 
-def open_listen_sock():
-    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+def open_listen_sock(port):
+    s = socket.socket(socket.AF_INET6, socket.SOCK_STREAM)
     s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-    s.bind(('', 6666))
+    a = (LISTEN_HOST, port)
+    s.bind(a)
     s.listen(100)
     s.setblocking(False)
     return s
@@ -98,20 +111,61 @@ def sig_handler(signo, stack_frame):
     print_flow_count()
     sys.exit(0)
 
-if __name__ == '__main__':
-    init_funcs()
 
-    if len(sys.argv) < 2:
-        log('missing net namespace name(s)')
+def parse_port_range(range_arg):
+    p1, p2 = (0, 0)
+    ports = range_arg.split('-')
+
+    if len(ports) == 1:
+        p1, p2 = int(ports[0]), int(ports[0])
+    elif len(ports) == 2:
+        p1, p2 = int(ports[0]), int(ports[1])
+    else:
+        log('bad port range: ' + ports)
         sys.exit(1)
 
-    for netns in sys.argv[1:]:
+    if p1 > p2:
+        log('bad port range: %d > %d' % (p1, p2))
+        sys.exit(1)
+
+    return p1, p2
+
+
+def usage(msg):
+    log('%s: %s' % (sys.argv[0], msg))
+    log(__doc__)
+
+
+def main():
+    init_funcs()
+
+    first_port = last_port = LISTEN_PORT
+
+    try:
+        opts, args = getopt.getopt(sys.argv[1:], 'p:')
+    except getopt.GetoptError as err:
+        usage(err)
+        sys.exit(1)
+
+    for o, a in opts:
+        if o == '-p':
+            first_port, last_port = parse_port_range(a)
+        else:
+            assert False, 'unhandled option'
+
+    if len(args) == 0:
+        usage('missing net namespace name(s)')
+        sys.exit(1)
+
+    for netns in args:
         enter_netns(netns)
-        s = open_listen_sock()
-        log(netns, 'listening at', s.getsockname())
-        sock_netns_map[s.fileno()] = netns
-        sel.register(s, selectors.EVENT_READ, accept)
-        log(sock_netns_map)
+        for port in range(first_port, last_port + 1):
+            s = open_listen_sock(port)
+            log(netns, 'listening at', s.getsockname())
+            sock_netns_map[s.fileno()] = netns
+            sel.register(s, selectors.EVENT_READ, accept)
+
+    log(sock_netns_map)
 
     signal.signal(signal.SIGINT, sig_handler)
     signal.signal(signal.SIGTERM, sig_handler)
@@ -126,3 +180,7 @@ if __name__ == '__main__':
                 callback(netns, fileobj, mask)
     except KeyboardInterrupt:
         print_flow_count()
+
+
+if __name__ == '__main__':
+    main()
