@@ -54,11 +54,11 @@ destroy_namespaces()
 
 	# client & server namespaces
 	for i in {0..9}; do
-		ip netns del C$i || true
-		ip netns del S$i || true
+		ip netns del C$i 2> /dev/null || true
+		ip netns del S$i 2> /dev/null || true
 	done
 	# router namespaces
-	ip netns del R || true
+	ip netns del R 2> /dev/null || true
 }
 
 link_namespaces()
