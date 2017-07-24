@@ -96,8 +96,6 @@ def read(netns, conn, mask):
         return
 
     conn_id = (conn.getsockname(), conn.getpeername())
-    if netns not in flow_register:
-        flow_register[netns] = {}
     flow_register[netns][conn_id] = True
 
 
@@ -159,6 +157,7 @@ def main():
 
     for netns in args:
         enter_netns(netns)
+        flow_register[netns] = {}
         for port in range(first_port, last_port + 1):
             s = open_listen_sock(port)
             log(netns, 'listening at', s.getsockname())
