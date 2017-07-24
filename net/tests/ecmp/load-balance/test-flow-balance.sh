@@ -23,6 +23,7 @@
 #
 
 set -o errexit
+#set -o xtrace
 
 create_namespaces()
 {
@@ -43,11 +44,11 @@ destroy_namespaces()
 
 	# client & server namespaces
 	for i in {0..9}; do
-		ip netns del C$i
-		ip netns del S$i
+		ip netns del C$i || true
+		ip netns del S$i || true
 	done
 	# router namespaces
-	ip netns del R
+	ip netns del R || true
 }
 
 link_namespaces()
@@ -133,14 +134,16 @@ check_ping()
 
 main()
 {
-	trap "destroy_namespaces" EXIT
+	# trap "destroy_namespaces" EXIT
 
+	destroy_namespaces
 	create_namespaces
 	link_namespaces
 	add_addreses
 	bring_up_links
 	conf_routing
 	check_ping
+	destroy_namespaces
 }
 
 main "$@"
