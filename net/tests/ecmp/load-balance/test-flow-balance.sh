@@ -17,6 +17,10 @@
 set -o errexit
 #set -o xtrace
 
+basedir=$(dirname "$0")
+server_out=/tmp/$(basename "$0").$$.out
+server_pid=
+
 print_topo()
 {
 	echo >&2 "* Topology"
@@ -148,6 +152,62 @@ check_ping()
 	done
 }
 
+start_server()
+{
+	echo >&2 "* Server start (output in $server_out)"
+
+	$basedir/tcp-sink-multi.py -p 8080-8089 S{0..9} > $server_out 2> /dev/null &
+	server_pid=$!
+	sleep 1
+}
+
+stop_server()
+{
+	kill $server_pid
+	wait
+
+	echo >&2 "* Server done"
+	echo >&2 "* Showing $server_out"
+	cat  >&2 $server_out
+}
+
+run_client()
+{
+	local NUM_ADDRS=10
+	local NUM_PORTS=10
+	local NUM_MSGS=10
+
+	local addr port
+	local netns=$1
+
+	echo >&2 "* Client $netns start"
+
+	for ((i = 0; i < $NUM_ADDRS; i++)); do
+		addr=3000::$((100+i))
+		for ((j = 0; j < $NUM_PORTS; j++)); do
+			port=$((8080+j))
+			for ((k = 0; k < $NUM_MSGS; k++)); do
+				echo "$addr $port $k" | ip netns exec $netns socat -u - tcp6:[$addr]:$port
+			done
+		done
+	done
+
+	echo >&2 "* Client $netns done"
+}
+
+run_clients()
+{
+	local i
+
+	# run in each client namespace in parallel
+	(
+		for i in {0..9}; do
+			run_client C$i &
+		done
+		wait
+	)
+}
+
 main()
 {
 	# trap "destroy_namespaces" EXIT
@@ -160,6 +220,9 @@ main()
 	print_topo
 	conf_routing
 	check_ping
+	start_server
+	run_clients
+	stop_server
 	destroy_namespaces
 }
 
