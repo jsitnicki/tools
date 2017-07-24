@@ -1,0 +1,61 @@
+Test if TCPv6 flows get distributed evenly with multipath routing.
+
+Example run:
+
+bash-4.3# ./test-flow-balance.sh
+* Topology
+
+C0 [1000::2] --.                                   .-- S0 [2000::2], [3000::100..109]
+                \                                 /
+C1 [1001::2] --- [1000..1009::1] R [2000..2009::1] --- S1 [2001::2], [3000::100..109]
+:               /                                 \    :
+C9 [1009::2] --'                                   '-- S9 [2009::2], [3000::100..109]
+
+* Multipath route
+
+3000::/64 metric 1024
+        nexthop via 2000::2  dev RS0 weight 1
+        nexthop via 2001::2  dev RS1 weight 1
+        nexthop via 2002::2  dev RS2 weight 1
+        nexthop via 2003::2  dev RS3 weight 1
+        nexthop via 2004::2  dev RS4 weight 1
+        nexthop via 2005::2  dev RS5 weight 1
+        nexthop via 2006::2  dev RS6 weight 1
+        nexthop via 2007::2  dev RS7 weight 1
+        nexthop via 2008::2  dev RS8 weight 1
+        nexthop via 2009::2  dev RS9 weight 1
+
+* Server start (output in /tmp/test-flow-balance.sh.142.out)
+* Client C4 start
+* Client C3 start
+* Client C2 start
+* Client C6 start
+* Client C7 start
+* Client C1 start
+* Client C8 start
+* Client C9 start
+* Client C0 start
+* Client C5 start
+* Client C5 done
+* Client C2 done
+* Client C8 done
+* Client C3 done
+* Client C7 done
+* Client C6 done
+* Client C9 done
+* Client C4 done
+* Client C1 done
+* Client C0 done
+* Server done
+* Showing /tmp/test-flow-balance.sh.142.out
+S8 1042
+S4 1009
+S7 996
+S6 969
+S3 1012
+S5 951
+S0 1017
+S9 1058
+S1 973
+S2 973
+bash-4.3#
