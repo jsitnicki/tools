@@ -13,17 +13,23 @@
 #   Listens on 10 addresses and 10 ports.
 #   Prints a count of received messages on each (address, port)
 #
-# Topology:
-#
-#  C0 [1000::100] --.   .-- S0 [2000::100..109]
-#                    \ /
-#  C1 [1001::101] --- R --- S1 [2000::100..109]
-#  ⋮                 / \    ⋮
-#  C9 [1009::109] --'   `-- S9 [2000::100..109]
-#
 
 set -o errexit
 #set -o xtrace
+
+print_topo()
+{
+	echo >&2 "* Topology"
+	cat >&2 <<-EOT
+
+	C0 [1000::2] --.                                   .-- S0 [2000::2], [3000::100..109]
+	                \                                 /
+	C1 [1001::2] --- [1000..1009::1] R [2000..2009::1] --- S1 [2001::2], [3000::100..109]
+	:               /                                 \    :
+	C9 [1009::2] --'                                   '-- S9 [2009::2], [3000::100..109]
+
+EOT
+}
 
 create_namespaces()
 {
@@ -66,15 +72,17 @@ add_addreses()
 	local i j
 
 	for i in {0..9}; do
-		ip -netns C$i addr add dev CR$i 100$i::10$i/64 nodad
 		ip -netns R   addr add dev RC$i 100$i::1/64 nodad
+		ip -netns C$i addr add dev CR$i 100$i::2/64 nodad
 	done
 
 	for i in {0..9}; do
+		ip -netns R   addr add dev RS$i 200$i::1/64 nodad
+		ip -netns S$i addr add dev SR$i 200$i::2/64 nodad
+
 		for j in  {0..9}; do
-			ip -netns S$i addr add dev SR$i 2000::10$j/64 nodad
+			ip -netns S$i addr add dev SR$i 3000::10$j/64 nodad
 		done
-		ip -netns R addr add dev RS$i 2000::1/64 nodad
 	done
 
 }
@@ -104,16 +112,21 @@ conf_routing()
 	ip netns exec R sysctl -q -w net.ipv6.conf.all.forwarding=1
 
 	for i in {0..9}; do
-		ip -netns C$i route add default via 100$i::1
-		ip -netns S$i route add default via 2000::1
+		ip -netns C$i -6 route add default via 100$i::1
+		ip -netns S$i -6 route add default via 200$i::1
 
-		ip -netns R route del 2000::/64 dev RS$i
-		nexthops="$nexthops nexthop dev RS$i"
+		nexthops="$nexthops nexthop via 200$i::2"
+		# XXX: Multiple interface routes don't get recognized as multipath for some reason...
+		# nexthops="$nexthops nexthop dev RS$i"
 	done
 
 	# shellcheck disable=SC2086
-	ip -netns R route add 2000::/64 $nexthops
-	# ip -netns R -6 route show
+	ip -netns R route add 3000::/64 $nexthops
+
+	echo >&2 "* Multipath route"
+	echo >&2
+	ip -netns R -6 route show 3000::/64 >&2
+	echo >&2
 }
 
 check_ping()
@@ -121,14 +134,17 @@ check_ping()
 	local i
 
 	for i in {0..9}; do
-		ip netns exec S$i ping -6 -c1 -w1 -n -q 2000::1     > /dev/null
-		ip netns exec C$i ping -6 -c1 -w1 -n -q 100$i::1    > /dev/null
-		ip netns exec R   ping -6 -c1 -w1 -n -q 100$i::10$i > /dev/null
+		ip netns exec C$i ping -6 -c1 -w1 -n -q 100$i::1 > /dev/null # Cx -> R
+		ip netns exec R   ping -6 -c1 -w1 -n -q 100$i::2 > /dev/null # R  -> Cx
+
+		ip netns exec S$i ping -6 -c1 -w1 -n -q 200$i::1 > /dev/null # Sx -> R
+		ip netns exec R   ping -6 -c1 -w1 -n -q 200$i::2 > /dev/null # R  -> Sx
+
 	done
 
 	for i in {0..9}; do
-		ip netns exec R   ping -6 -c1 -w1 -n -q 2000::10$i > /dev/null
-		ip netns exec C$i ping -6 -c1 -w1 -n -q 2000::10$i > /dev/null
+		ip netns exec R   ping -6 -c1 -w1 -n -q 3000::10$i > /dev/null
+		ip netns exec C$i ping -6 -c1 -w1 -n -q 3000::10$i > /dev/null
 	done
 }
 
@@ -141,6 +157,7 @@ main()
 	link_namespaces
 	add_addreses
 	bring_up_links
+	print_topo
 	conf_routing
 	check_ping
 	destroy_namespaces
