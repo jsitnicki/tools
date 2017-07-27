@@ -54,23 +54,23 @@ conf_tso_off()
 
 	ns1=C1
 	for ns2 in F1 F2 R1; do
-		$ns1 ethtool -K $ns1$ns2 tso off
-		$ns2 ethtool -K $ns2$ns1 tso off
+		$ns1 ethtool -K $ns1$ns2 tso off 2> /dev/null
+		$ns2 ethtool -K $ns2$ns1 tso off 2> /dev/null
 		ns1=$ns2
 	done
 
 	ns1=R1
 	for ns2 in L{1..9}; do
-		$ns1 ethtool -K $ns1$ns2 tso off
-		$ns2 ethtool -K $ns2$ns1 tso off
+		$ns1 ethtool -K $ns1$ns2 tso off 2> /dev/null
+		$ns2 ethtool -K $ns2$ns1 tso off 2> /dev/null
 	done
 
 	for i in {1..9}; do
 		ns1=L$i
 		ns2=S$i
 
-		$ns1 ethtool -K $ns1$ns2 tso off
-		$ns2 ethtool -K $ns2$ns1 tso off
+		$ns1 ethtool -K $ns1$ns2 tso off 2> /dev/null
+		$ns2 ethtool -K $ns2$ns1 tso off 2> /dev/null
 	done
 }
 
