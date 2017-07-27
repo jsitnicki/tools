@@ -1,0 +1,139 @@
+Test that Path MTU Discovery works with Multipath Routing. The test
+exercises ICMPv6 PTB routing is forward and local output path.
+
+Sample run:
+
+bash-4.3# ./run-tests.sh
+
+ *********************************
+  Run 1. MTU 1500 in all segments
+         (no PTB routing)
+ *********************************
+
+ * Network topology #1
+
+                                .- [L1] -- [S1]
+                               /
+   [C1] -- [F1] -- [F2] -- [R1] -- [L2] -- [S2]
+                               \    ⋮       ⋮
+                                `- [L9] -- [S9]
+
+ * L3 segments
+
+   C1-F1  10.0.1./24, fd00:0:1::/64
+   F1-F2  10.0.2./24, fd00:0:2::/64
+   F2-R1  10.0.3./24, fd00:0:3::/64
+   R1-Lx  10.1.x./24, fd00:1:x::/64
+   Lx-Sx  10.2.0./24, fd00:2:0::/64
+
+ * Starting setup
+ * Creating namespaces
+ * Linking namespaces
+ * Setting TSO off to make PMTUD work NS-NS
+ * Configuring IPv4 forwarding
+ * Configuring IPv6 forwarding
+ * Enabling Flow Label reflection on server namespaces (EXPERIMENTAL)
+ * Configuring IPv4 addresses
+ * Configuring IPv6 addresses
+ * Bringing interfaces up
+ * Configuring default IPv4 routes
+ * Configuring default IPv6 routes
+ * Testing IPv4 ping to local address and to neighbours
+ * Testing IPv4 through ECMP router
+ * Testing IPv6 ping to local address and to neighbours
+ * Testing IPv6 through ECMP router
+ * Testing HTTP over IPv4
+ * Testing HTTP over IPv6
+ * Starting teardown
+ * Kill all processes in namespaces
+ * Destroy namespaces
+
+**********************************
+ Run 2. MTU 1400 in F2-R1 segment
+        (PTB routing on OUTPUT)
+**********************************
+
+ * Network topology #2
+
+                                .- [L1] -- [S1]
+                               /
+   [C1] -- [F1] -- [F2] == [R1] -- [L2] -- [S2]
+                               \    ⋮       ⋮
+                                `- [L9] -- [S9]
+
+ * L3 segments
+
+   C1-F1  10.0.1./24, fd00:0:1::/64
+   F1-F2  10.0.2./24, fd00:0:2::/64
+   F2-R1  10.0.3./24, fd00:0:3::/64
+   R1-Lx  10.1.x./24, fd00:1:x::/64
+   Lx-Sx  10.2.0./24, fd00:2:0::/64
+
+ * Starting setup
+ * Creating namespaces
+ * Linking namespaces
+ * Setting TSO off to make PMTUD work NS-NS
+ * Configuring IPv4 forwarding
+ * Configuring IPv6 forwarding
+ * Enabling Flow Label reflection on server namespaces (EXPERIMENTAL)
+ * Configuring IPv4 addresses
+ * Configuring IPv6 addresses
+ * Bringing interfaces up
+ * Configuring default IPv4 routes
+ * Configuring default IPv6 routes
+ * Setting F2-R1 link MTU to 1400
+ * Testing IPv4 ping to local address and to neighbours
+ * Testing IPv4 through ECMP router
+ * Testing IPv6 ping to local address and to neighbours
+ * Testing IPv6 through ECMP router
+ * Testing HTTP over IPv4
+ * Testing HTTP over IPv6
+ * Starting teardown
+ * Kill all processes in namespaces
+ * Destroy namespaces
+
+**********************************
+ Run 3. MTU 1400 in F1-F2 segment
+        (PTB routing on FORWARD)
+**********************************
+
+ * Network topology #3
+
+                                .- [L1] -- [S1]
+                               /
+   [C1] -- [F1] == [F2] -- [R1] -- [L2] -- [S2]
+                               \    ⋮       ⋮
+                                `- [L9] -- [S9]
+
+ * L3 segments
+
+   C1-F1  10.0.1./24, fd00:0:1::/64
+   F1-F2  10.0.2./24, fd00:0:2::/64
+   F2-R1  10.0.3./24, fd00:0:3::/64
+   R1-Lx  10.1.x./24, fd00:1:x::/64
+   Lx-Sx  10.2.0./24, fd00:2:0::/64
+
+ * Starting setup
+ * Creating namespaces
+ * Linking namespaces
+ * Setting TSO off to make PMTUD work NS-NS
+ * Configuring IPv4 forwarding
+ * Configuring IPv6 forwarding
+ * Enabling Flow Label reflection on server namespaces (EXPERIMENTAL)
+ * Configuring IPv4 addresses
+ * Configuring IPv6 addresses
+ * Bringing interfaces up
+ * Configuring default IPv4 routes
+ * Configuring default IPv6 routes
+ * Setting F1-F2 link MTU to 1400
+ * Testing IPv4 ping to local address and to neighbours
+ * Testing IPv4 through ECMP router
+ * Testing IPv6 ping to local address and to neighbours
+ * Testing IPv6 through ECMP router
+ * Testing HTTP over IPv4
+ * Testing HTTP over IPv6
+ * Starting teardown
+ * Kill all processes in namespaces
+ * Destroy namespaces
+SUCCESS
+bash-4.3#
