@@ -1,0 +1,105 @@
+count_lflow_run.sh can be used to see which operations trigger full processing
+of logical flow table contents by the ovn-controller.
+
+This sample run has been done with v2 of "ovn-controller incremental processing"
+patch set: https://patchwork.ozlabs.org/project/openvswitch/list/?series=46497
+
+$ /path/to/ovs-sim ./count_lflow_run.sh
+Counting calls to lflow_run() for each operation...
+
+HV1  HV2  COMMAND
+---  ---  -------
+
+          # Add router lr1
+  2    2  ovn-nbctl lr-add lr1
+
+          # Add switch ls1
+  1    1  ovn-nbctl --wait=hv ls-add ls1
+          ovn-nbctl --wait=hv add Logical_Switch ls1 other_config subnet=10.0.1.0/24
+
+          # Add router port to ls1
+  1    1  ovn-nbctl --wait=hv lrp-add lr1 lr1-ls1 02:00:00:00:01:01 10.0.1.1/24
+          ovn-nbctl --wait=hv lsp-add ls1 ls1-lr1
+  1    1  ovn-nbctl --wait=hv lsp-set-type ls1-lr1 router
+  1    1  ovn-nbctl --wait=hv lsp-set-addresses ls1-lr1 router
+
+          # Add switch ls2
+  1    1  ovn-nbctl --wait=hv ls-add ls2
+          ovn-nbctl --wait=hv add Logical_Switch ls2 other_config subnet=10.0.2.0/24
+
+          # Add router port to ls2
+  1    1  ovn-nbctl --wait=hv lrp-add lr1 lr1-ls2 02:00:00:00:02:01 10.0.2.1/24
+          ovn-nbctl --wait=hv lsp-add ls2 ls2-lr1
+  1    1  ovn-nbctl --wait=hv lsp-set-type ls2-lr1 router
+  1    1  ovn-nbctl --wait=hv lsp-set-addresses ls2-lr1 router
+
+          # Add port lp1
+          ovn-nbctl --wait=hv lsp-add ls1 lp1
+          ovn-nbctl --wait=hv lsp-set-addresses lp1 dynamic
+          ovn-nbctl --wait=hv wait-until Logical_Switch_Port lp1 dynamic_addresses!=[]
+          ovn-nbctl --wait=hv get Logical_Switch_Port lp1 dynamic_addresses
+
+          # Add address set as1
+  1    1  ovn-nbctl --wait=hv create Address_Set name=as1
+  1    1  ovn-nbctl --wait=hv add Address_Set as1 addresses 10.0.1.10
+
+          # Add ACLs for port lp1
+          ovn-nbctl --wait=hv acl-add ls1 to-lport 1001 outport == "lp1" && ip4.src == $as1 allow
+          ovn-nbctl --wait=hv acl-add ls1 to-lport 1000 outport == "lp1" drop
+
+          # Bind port lp1
+  4    0  as hv1 ovs-vsctl add-port br-int vif1 -- set Interface vif1 external-ids:iface-id=lp1
+
+          # Wait for port lp1
+          ovn-nbctl --wait=hv wait-until Logical_Switch_Port lp1 up=true
+
+          # Add port lp2
+          ovn-nbctl --wait=hv lsp-add ls2 lp2
+          ovn-nbctl --wait=hv lsp-set-addresses lp2 dynamic
+          ovn-nbctl --wait=hv wait-until Logical_Switch_Port lp2 dynamic_addresses!=[]
+          ovn-nbctl --wait=hv get Logical_Switch_Port lp2 dynamic_addresses
+
+          # Add address set as2
+  1    1  ovn-nbctl --wait=hv create Address_Set name=as2
+  1    1  ovn-nbctl --wait=hv add Address_Set as2 addresses 10.0.2.10
+
+          # Add ACLs for port lp2
+          ovn-nbctl --wait=hv acl-add ls2 to-lport 1001 outport == "lp2" && ip4.src == $as2 allow
+          ovn-nbctl --wait=hv acl-add ls2 to-lport 1000 outport == "lp2" drop
+
+          # Bind port lp2
+  0    3  as hv2 ovs-vsctl add-port br-int vif2 -- set Interface vif2 external-ids:iface-id=lp2
+
+          # Wait for port lp2
+          ovn-nbctl --wait=hv wait-until Logical_Switch_Port lp2 up=true
+
+          # Delete port lp1
+  1    0  ovn-nbctl --wait=hv lsp-del lp1
+
+          # Delete ACLs for port lp1
+          ovn-nbctl --wait=hv acl-del ls1 to-lport 1001 outport == "lp1" && ip4.src == $as1
+          ovn-nbctl --wait=hv acl-del ls1 to-lport 1000 outport == "lp1"
+
+          # Delete address set as1
+  1    1  ovn-nbctl --wait=hv remove Address_Set as1 addresses 10.0.1.10
+  1    1  ovn-nbctl --wait=hv destroy Address_Set as1
+
+          # Delete port lp2
+  0    1  ovn-nbctl --wait=hv lsp-del lp2
+
+          # Delete ACLs for port lp2
+          ovn-nbctl --wait=hv acl-del ls2 to-lport 1001 outport == "lp2" && ip4.src == $as2
+          ovn-nbctl --wait=hv acl-del ls2 to-lport 1000 outport == "lp2"
+
+          # Delete address set as2
+  1    1  ovn-nbctl --wait=hv remove Address_Set as2 addresses 10.0.2.10
+  1    1  ovn-nbctl --wait=hv destroy Address_Set as2
+
+          # Delete switch ls1
+  1    1  ovn-nbctl ls-del ls1
+
+          # Delete switch ls2
+  1    1  ovn-nbctl ls-del ls2
+
+          # Delete router lr1
+  1    1  ovn-nbctl lr-del lr1
