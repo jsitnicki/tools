@@ -1,0 +1,10 @@
+KDIR ?= /lib/modules/`uname -r`/build
+
+# kbuild
+obj-m := example.o
+
+default:
+	$(MAKE) -C $(KDIR) M=$$PWD
+
+clean:
+	rm -f *.o *.ko modules.order Module.symvers *~ *.mod.c .*.cmd *.mod
