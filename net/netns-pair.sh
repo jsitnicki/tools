@@ -26,7 +26,8 @@ PS1='sandbox \\$ '
 
 set -x
 
-mount -t tmpfs tmpfs /var/run/netns
+mount -t tmpfs tmpfs /var/run
+mkdir /var/run/netns
 
 ip netns add A
 ip netns add B

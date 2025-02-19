@@ -20,5 +20,5 @@ END
 (( $# == 0 )) && usage
 
 echo "PID is $$"
-read -p "Enter to run '$*'"
+read -p "Hit enter to run '$*'"
 exec "$@"
